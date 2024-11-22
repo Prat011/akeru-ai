@@ -190,3 +190,77 @@ Format the notes in markdown with:
     throw error;
   }
 };
+
+export const generateSlides = async (topic, content, apiKey) => {
+  if (!apiKey) {
+    throw new Error('Gemini API key is required');
+  }
+
+  const prompt = `Create a presentation slide deck for the topic "${topic}" based on this content:
+
+${content}
+
+Format the response as a JSON array of slides. Each slide should have a 'title' and 'content' field.
+The content should be in markdown format and include bullet points.
+Include code examples where relevant.
+Keep each slide focused and concise.
+Include these slide types:
+- Title slide with topic name and brief description
+- Overview/Agenda of what will be covered
+- Key concepts with clear explanations
+- Code examples with explanations
+- Best practices and tips
+- Summary of main points
+
+Example format:
+[
+  {
+    "title": "Introduction to Topic",
+    "content": "# Main points\\n- Point 1\\n- Point 2"
+  }
+]
+
+Make sure each slide is informative but not overwhelming. Use bullet points for better readability.`;
+
+  const headers = {
+    'Content-Type': 'application/json'
+  };
+
+  const body = {
+    contents: [{
+      parts: [{
+        text: prompt
+      }]
+    }],
+    generationConfig: {
+      maxOutputTokens: 2048,
+      temperature: 0.7
+    }
+  };
+
+  try {
+    const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
+      throw new Error('Invalid response format from Gemini API');
+    }
+
+    const slidesText = data.candidates[0].content.parts[0].text;
+    // Parse the JSON response while handling potential JSON within markdown code blocks
+    const slides = JSON.parse(slidesText.replace(/```json\n|\n```/g, ''));
+    
+    return slides;
+  } catch (error) {
+    console.error('Error generating slides:', error);
+    throw error;
+  }
+};
